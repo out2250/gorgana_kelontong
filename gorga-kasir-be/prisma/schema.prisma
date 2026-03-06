@@ -1,0 +1,557 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  owner
+  manager
+  cashier
+}
+
+enum SubscriptionStatus {
+  trial
+  active
+  past_due
+  inactive
+}
+
+enum PaymentStatus {
+  unpaid
+  paid
+}
+
+enum TenantStatus {
+  pending_approval
+  active
+  rejected
+  inactive
+}
+
+enum SubscriptionRequestStatus {
+  approve
+  refund
+  force_inactive
+  rejected
+}
+
+enum EmployeeConditionStatus {
+  on_duty
+  on_leave
+  sick
+  on_penalty
+}
+
+enum EmployeeAttendanceStatus {
+  present
+  absent
+  late
+  off
+}
+
+enum StockMovementType {
+  in
+  out
+  adjustment
+  sale
+}
+
+enum TicketStatus {
+  open
+  in_progress
+  resolved
+}
+
+enum ShiftStatus {
+  open
+  closed
+}
+
+enum StockOpnameStatus {
+  open
+  submitted
+  approved
+  rejected
+}
+
+model Tenant {
+  id            String         @id @default(uuid())
+  name          String
+  status        TenantStatus   @default(pending_approval)
+  fullName      String?
+  contactPhone  String?
+  address       String?
+  dateOfBirth   DateTime?
+  additionalData Json?
+  approvedAt    DateTime?
+  approvedBy    String?
+  rejectionReason String?
+  createdAt     DateTime       @default(now())
+  users         User[]
+  stores        Store[]
+  subscriptions Subscription[]
+  sales         Sale[]
+  expenses      Expense[]
+  tickets       SupportTicket[]
+  shifts        CashierShift[]
+  purchases     Purchase[]
+  stockOpnames  StockOpnameSession[]
+  categories    Category[]
+  brands        Brand[]
+  suppliers     Supplier[]
+}
+
+model Subscription {
+  id        String             @id @default(uuid())
+  tenantId  String
+  plan      String
+  status    SubscriptionStatus
+  requestStatus SubscriptionRequestStatus?
+  paymentStatus PaymentStatus  @default(unpaid)
+  trialEnabled Boolean         @default(true)
+  startsAt  DateTime
+  endsAt    DateTime?
+  createdAt DateTime           @default(now())
+  tenant    Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status, paymentStatus])
+}
+
+model Store {
+  id             String            @id @default(uuid())
+  tenantId       String
+  name           String
+  address        String?
+  isActive       Boolean           @default(true)
+  createdAt      DateTime          @default(now())
+  tenant         Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  products       Product[]
+  stockMovements StockMovement[]
+  sales          Sale[]
+  userAccesses   UserStoreAccess[]
+  expenses       Expense[]
+  tickets        SupportTicket[]
+  shifts         CashierShift[]
+  purchases      Purchase[]
+  stockOpnames   StockOpnameSession[]
+}
+
+model User {
+  id           String            @id @default(uuid())
+  tenantId     String
+  username     String?           @unique
+  fullName     String
+  email        String            @unique
+  passwordHash String
+  role         Role
+  profileImageUrl String?        @db.MediumText
+  mfaEnabled   Boolean           @default(false)
+  mfaSecret    String?
+  mfaTempSecret String?
+  address      String?
+  phoneNumber  String?
+  jobResponsibility String?
+  conditionStatus EmployeeConditionStatus @default(on_duty)
+  attendanceStatus EmployeeAttendanceStatus @default(off)
+  scheduleLabel String?
+  scheduleStartTime String?
+  scheduleEndTime String?
+  isActive     Boolean           @default(true)
+  createdAt    DateTime          @default(now())
+  tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  storeAccess  UserStoreAccess[]
+  sales        Sale[]
+  expenses     Expense[]
+  openedTickets SupportTicket[]
+  refreshTokens RefreshToken[]
+  loginAttempts LoginAttempt[]
+  auditLogs     AuditLog[]
+  loginChallenges LoginChallenge[]
+  shifts       CashierShift[]
+  purchases    Purchase[]
+  createdStockOpnames  StockOpnameSession[] @relation("StockOpnameCreatedBy")
+  approvedStockOpnames StockOpnameSession[] @relation("StockOpnameApprovedBy")
+  assignedStockOpnames StockOpnameSession[] @relation("StockOpnameAssignedTo")
+  assignedByStockOpnames StockOpnameSession[] @relation("StockOpnameAssignedBy")
+}
+
+model LoginChallenge {
+  id         String   @id @default(uuid())
+  userId     String
+  expiresAt  DateTime
+  attempts   Int      @default(0)
+  fulfilledAt DateTime?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model LoginAttempt {
+  id         String   @id @default(uuid())
+  userId      String?
+  email       String
+  ipAddress   String
+  userAgent   String?
+  isSuccess   Boolean  @default(false)
+  attemptedAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([email, ipAddress, attemptedAt])
+  @@index([userId, attemptedAt])
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  tenantId    String?
+  actorUserId String?
+  action      String
+  entityType  String
+  entityId    String
+  beforeData  Json?
+  afterData   Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  actorUser User? @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([entityType, entityId, createdAt])
+}
+
+model UserStoreAccess {
+  userId    String
+  storeId   String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@id([userId, storeId])
+}
+
+model Product {
+  id             String          @id @default(uuid())
+  storeId        String
+  sku            String
+  barcode        String?
+  name           String
+  category       String?
+  categoryId     String?
+  brandId        String?
+  unitMeasure    String?         @default("mL")
+  unitValue      Decimal         @default(1)
+  sellCategories Json?
+  costPrice      Decimal?
+  sellPrice      Decimal
+  minimumStock   Int             @default(0)
+  stockOnHand    Int             @default(0)
+  isActive       Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  store          Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  categoryRef    Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  brand          Brand?          @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  stockMovements StockMovement[]
+  saleItems      SaleItem[]
+  purchaseItems  PurchaseItem[]
+  stockOpnameItems StockOpnameItem[]
+  productSuppliers ProductSupplier[]
+
+  @@unique([storeId, sku])
+  @@unique([storeId, barcode])
+  @@index([categoryId])
+  @@index([brandId])
+  @@index([barcode])
+}
+
+model Category {
+  id          String      @id @default(uuid())
+  tenantId    String
+  name        String
+  parentId    String?
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  parent      Category?   @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children    Category[]  @relation("CategoryTree")
+  products    Product[]   @relation()
+
+  @@unique([tenantId, name])
+  @@index([tenantId, parentId, isActive])
+}
+
+model Brand {
+  id          String      @id @default(uuid())
+  tenantId    String
+  name        String
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  products    Product[]   @relation()
+
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive])
+}
+
+model Supplier {
+  id             String            @id @default(uuid())
+  tenantId       String
+  name           String
+  phone          String?
+  address        String?
+  isActive       Boolean           @default(true)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  tenant         Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  productLinks   ProductSupplier[]
+  purchases      Purchase[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive])
+}
+
+model ProductSupplier {
+  id            String    @id @default(uuid())
+  productId     String
+  supplierId    String
+  supplierPrice Decimal?
+  leadTimeDays  Int?
+  isPrimary     Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  product       Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  supplier      Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, supplierId])
+  @@index([supplierId])
+}
+
+model StockOpnameSession {
+  id           String            @id @default(uuid())
+  tenantId     String
+  storeId      String
+  createdBy    String
+  assignedTo   String?
+  assignedBy   String?
+  assignedAt   DateTime?
+  approvedBy   String?
+  status       StockOpnameStatus @default(open)
+  notes        String?
+  approvedAt   DateTime?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  store    Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  creator  User   @relation("StockOpnameCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
+  assignee User?  @relation("StockOpnameAssignedTo", fields: [assignedTo], references: [id], onDelete: SetNull)
+  assigner User?  @relation("StockOpnameAssignedBy", fields: [assignedBy], references: [id], onDelete: SetNull)
+  approver User?  @relation("StockOpnameApprovedBy", fields: [approvedBy], references: [id], onDelete: SetNull)
+  items    StockOpnameItem[]
+
+  @@index([tenantId, status, createdAt])
+  @@index([storeId, status, createdAt])
+}
+
+model StockOpnameItem {
+  id             String   @id @default(uuid())
+  sessionId      String
+  productId      String
+  systemStock    Int
+  countedStock   Int
+  difference     Int
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  session StockOpnameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  product Product            @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([sessionId, productId])
+  @@index([productId])
+}
+
+model Purchase {
+  id           String         @id @default(uuid())
+  tenantId     String
+  storeId      String
+  createdBy    String
+  supplierId   String
+  invoiceNumber String?
+  notes        String?
+  purchasedAt  DateTime
+  createdAt    DateTime       @default(now())
+
+  tenant   Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  store    Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user     User        @relation(fields: [createdBy], references: [id], onDelete: Restrict)
+  supplier Supplier    @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  items    PurchaseItem[]
+
+  @@index([tenantId, purchasedAt])
+  @@index([storeId, purchasedAt])
+  @@index([supplierId])
+}
+
+model PurchaseItem {
+  id        String   @id @default(uuid())
+  purchaseId String
+  productId String
+  quantity  Int
+  unitCost  Decimal
+  lineTotal Decimal
+
+  purchase Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([productId])
+}
+
+model StockMovement {
+  id         String            @id @default(uuid())
+  storeId    String
+  productId  String
+  type       StockMovementType
+  quantity   Int
+  reason     String?
+  referenceId String?
+  createdAt  DateTime          @default(now())
+  store      Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  product    Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, createdAt])
+}
+
+model Sale {
+  id             String   @id @default(uuid())
+  tenantId       String
+  storeId        String
+  cashierUserId  String
+  idempotencyKey String
+  paymentMethod  String
+  paymentDetails Json?
+  referenceNumber String?
+  paidAmount     Decimal?
+  changeAmount   Decimal?
+  subtotal       Decimal
+  discount       Decimal  @default(0)
+  promoCode      String?
+  promoDiscount  Decimal  @default(0)
+  total          Decimal
+  soldAt         DateTime
+  createdAt      DateTime @default(now())
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  store          Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  cashier        User     @relation(fields: [cashierUserId], references: [id], onDelete: Restrict)
+  items          SaleItem[]
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([storeId, soldAt])
+}
+
+model SaleItem {
+  id        String  @id @default(uuid())
+  saleId    String
+  productId String
+  quantity  Int
+  unitPrice Decimal
+  discount  Decimal @default(0)
+  lineTotal Decimal
+  sale      Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+}
+
+model Expense {
+  id        String   @id @default(uuid())
+  tenantId  String
+  storeId   String
+  createdBy String
+  title     String
+  amount    Decimal
+  notes     String?
+  spentAt   DateTime
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  store  Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [createdBy], references: [id], onDelete: Restrict)
+
+  @@index([storeId, spentAt])
+  @@index([tenantId, spentAt])
+}
+
+model SupportTicket {
+  id          String       @id @default(uuid())
+  tenantId    String
+  storeId     String
+  openedBy    String
+  title       String
+  description String
+  priority    String       @default("normal")
+  status      TicketStatus @default(open)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  store  Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [openedBy], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, status])
+  @@index([storeId, createdAt])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String   @unique
+  deviceId  String?
+  userAgent String?
+  ipAddress String?
+  lastUsedAt DateTime?
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([userId, deviceId, revokedAt])
+  @@index([expiresAt])
+}
+
+model CashierShift {
+  id              String      @id @default(uuid())
+  tenantId        String
+  storeId         String
+  openedByUserId  String
+  openingCash     Decimal
+  closingCash     Decimal?
+  expectedCash    Decimal?
+  cashDifference  Decimal?
+  notes           String?
+  status          ShiftStatus @default(open)
+  openedAt        DateTime    @default(now())
+  closedAt        DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  store  Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [openedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, storeId, status])
+  @@index([openedByUserId, status])
+  @@index([storeId, openedAt])
+}

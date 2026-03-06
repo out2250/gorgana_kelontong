@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: kelonton_digital
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    defaults:
+      run:
+        working-directory: gorga-kasir-be
+    env:
+      DATABASE_URL: mysql://root:root@127.0.0.1:3306/kelonton_digital
+      JWT_SECRET: test_secret_12345678
+      FRONTEND_ORIGIN: http://localhost:5173
+      PORT: 4000
+      SLA_HEALTH_MAX_MS: 700
+      SLA_AUTH_MAX_MS: 1800
+      SLA_DASHBOARD_MAX_MS: 2200
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: gorga-kasir-be/package-lock.json
+      - run: npm ci
+      - run: npm run prisma:generate
+      - run: npx prisma migrate deploy
+      - run: npm run prisma:seed
+      - run: npm run test
+      - run: npm run build
+      - name: Start API server
+        run: |
+          npm run start > /tmp/api.log 2>&1 &
+          echo $! > /tmp/api.pid
+      - name: Wait for API health
+        run: |
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:4000/api/health > /dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "API server did not become healthy in time"
+          cat /tmp/api.log || true
+          exit 1
+      - run: npm run smoke:api
+      - run: npm run test:tenant-guardrail
+      - run: npm run test:finance-integration
+      - run: npm run test:hardening-integration
+      - run: npm run test:costing-permission
+      - run: npm run test:costing-flow
+      - run: npm run test:sla
+      - name: Print API log on failure
+        if: failure()
+        run: cat /tmp/api.log || true
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: gorga-kasir-fe
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: gorga-kasir-fe/package-lock.json
+      - run: npm ci
+      - run: npm run type-check
+      - run: npm run test
+      - run: npm run build

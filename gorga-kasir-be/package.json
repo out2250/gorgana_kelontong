@@ -1,0 +1,51 @@
+{
+  "name": "gorga-kasir-be",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "dev:reset": "powershell -ExecutionPolicy Bypass -File ./scripts/dev-reset.ps1",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "smoke:api": "tsx scripts/smoke-api.ts",
+    "test:tenant-guardrail": "tsx scripts/tenant-guardrail.ts",
+    "test:finance-integration": "tsx scripts/finance-integration.ts",
+    "test:hardening-integration": "tsx scripts/hardening-integration.ts",
+    "test:costing-permission": "tsx scripts/costing-permission-integration.ts",
+    "test:costing-flow": "tsx scripts/inventory-costing-integration.ts",
+    "test:inventory-costing": "npm run test:costing-permission && npm run test:costing-flow",
+    "test:sla": "tsx scripts/sla-check.ts",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:seed": "tsx prisma/seed.ts",
+    "prisma:seed:bulk": "tsx prisma/seed.bulk.ts",
+    "prisma:studio": "prisma studio",
+    "backup:db": "powershell -ExecutionPolicy Bypass -File ./scripts/backup-db.ps1",
+    "restore:db": "powershell -ExecutionPolicy Bypass -File ./scripts/restore-db.ps1"
+  },
+  "dependencies": {
+    "@sentry/node": "^10.21.0",
+    "@aws-sdk/client-s3": "^3.1002.0",
+    "@fastify/cors": "^10.0.2",
+    "@fastify/helmet": "^13.0.2",
+    "@fastify/rate-limit": "^10.3.0",
+    "@prisma/client": "^6.5.0",
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.4.7",
+    "fastify": "^5.2.1",
+    "jsonwebtoken": "^9.0.2",
+    "otplib": "^13.3.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.9",
+    "@types/node": "^22.13.10",
+    "prisma": "^6.5.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2",
+    "vitest": "^3.2.4"
+  }
+}
