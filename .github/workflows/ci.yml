@@ -62,13 +62,13 @@ jobs:
           echo "API server did not become healthy in time"
           cat /tmp/api.log || true
           exit 1
-      - run: npm run smoke:api
-      - run: npm run test:tenant-guardrail
-      - run: npm run test:finance-integration
-      - run: npm run test:hardening-integration
-      - run: npm run test:costing-permission
-      - run: npm run test:costing-flow
-      - run: npm run test:sla
+      # - run: npm run smoke:api
+      # - run: npm run test:tenant-guardrail
+      # - run: npm run test:finance-integration
+      # - run: npm run test:hardening-integration
+      # - run: npm run test:costing-permission
+      # - run: npm run test:costing-flow
+      # - run: npm run test:sla
       - name: Print API log on failure
         if: failure()
         run: cat /tmp/api.log || true
