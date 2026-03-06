@@ -1,9 +1,7 @@
--- AlterTable
-ALTER TABLE `subscription`
+ALTER TABLE `Subscription`
   ADD COLUMN `requestStatus` ENUM('approve', 'refund', 'force_inactive', 'rejected') NULL;
 
--- AlterTable
-ALTER TABLE `user`
+ALTER TABLE `User`
   ADD COLUMN `conditionStatus` ENUM('on_duty', 'on_leave', 'sick', 'on_penalty') NOT NULL DEFAULT 'on_duty',
   ADD COLUMN `attendanceStatus` ENUM('present', 'absent', 'late', 'off') NOT NULL DEFAULT 'off',
   ADD COLUMN `scheduleLabel` VARCHAR(191) NULL,
