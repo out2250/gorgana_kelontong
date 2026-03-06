@@ -119,15 +119,14 @@ async function bootstrap() {
         callback(null, true);
         return;
       }
-
       if (origin === env.frontendOrigin) {
         callback(null, true);
         return;
       }
-
       const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
       callback(null, isLocalhost);
     },
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     credentials: true
   });
 
