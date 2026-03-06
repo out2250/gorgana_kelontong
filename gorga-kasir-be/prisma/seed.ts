@@ -270,13 +270,21 @@ async function main() {
 
   const superAdmin = await prisma.user.upsert({
     where: { email: superAdminEmail },
-    update: { tenantId: tenantMain.id, username: "superadmin.demo", fullName: "Super Admin Demo", passwordHash: superAdminPassword, role: "owner", isActive: true, jobResponsibility: "Super Admin" },
+    update: {
+      tenantId: tenantMain.id,
+      username: "superadmin.demo",
+      fullName: "Super Admin Demo",
+      passwordHash: passwordHash,
+      role: "owner",
+      isActive: true,
+      jobResponsibility: "Super Admin"
+    },
     create: {
       tenantId: tenantMain.id,
       username: "superadmin.demo",
       fullName: "Super Admin Demo",
       email: superAdminEmail,
-      passwordHash: superAdminPassword,
+      passwordHash: passwordHash,
       role: "owner",
       isActive: true,
       jobResponsibility: "Super Admin"
