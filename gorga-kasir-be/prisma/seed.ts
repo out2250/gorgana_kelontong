@@ -4,7 +4,6 @@ import crypto from "crypto";
 import { prisma } from "../src/lib/prisma";
 
 async function main() {
-  const demoPasswordHash = await bcrypt.hash("password123", 10);
   const superAdminEmail = process.env.SUPERADMIN_EMAIL;
   const superadminPassword = process.env.SUPERADMIN_PASSWORD;
 
@@ -247,7 +246,7 @@ async function main() {
       tenantId: tenantMain.id,
       username: "owner.demo",
       fullName: "Owner Demo",
-      passwordHash: demoPasswordHash,
+      passwordHash: passwordHash,
       role: "owner",
       isActive: true,
       address: "Kampung Barat",
@@ -259,7 +258,7 @@ async function main() {
       username: "owner.demo",
       fullName: "Owner Demo",
       email: "owner@klontong.local",
-      passwordHash: demoPasswordHash,
+      passwordHash: passwordHash,
       role: "owner",
       isActive: true,
       address: "Kampung Barat",
@@ -297,7 +296,7 @@ async function main() {
       tenantId: tenantMain.id,
       username: "manager.demo",
       fullName: "Manager Demo",
-      passwordHash: demoPasswordHash,
+      passwordHash: passwordHash,
       role: "manager",
       isActive: true,
       address: "Kampung Barat",
@@ -309,7 +308,7 @@ async function main() {
       username: "manager.demo",
       fullName: "Manager Demo",
       email: "manager@klontong.local",
-      passwordHash: demoPasswordHash,
+      passwordHash: passwordHash,
       role: "manager",
       isActive: true,
       address: "Kampung Barat",
@@ -324,7 +323,7 @@ async function main() {
       tenantId: tenantMain.id,
       username: "cashier.demo",
       fullName: "Kasir Demo",
-      passwordHash: demoPasswordHash,
+      passwordHash: passwordHash,
       role: "cashier",
       isActive: true,
       address: "Kampung Barat",
@@ -336,7 +335,7 @@ async function main() {
       username: "cashier.demo",
       fullName: "Kasir Demo",
       email: "cashier@klontong.local",
-      passwordHash: demoPasswordHash,
+      passwordHash: passwordHash,
       role: "cashier",
       isActive: true,
       address: "Kampung Barat",
@@ -347,13 +346,13 @@ async function main() {
 
   await prisma.user.upsert({
     where: { email: "owner+pastdue@klontong.local" },
-    update: { tenantId: tenantPastDue.id, username: "owner.pastdue", fullName: "Owner Past Due", passwordHash: demoPasswordHash, role: "owner", isActive: false, jobResponsibility: "Store Owner" },
+    update: { tenantId: tenantPastDue.id, username: "owner.pastdue", fullName: "Owner Past Due", passwordHash: passwordHash, role: "owner", isActive: false, jobResponsibility: "Store Owner" },
     create: {
       tenantId: tenantPastDue.id,
       username: "owner.pastdue",
       fullName: "Owner Past Due",
       email: "owner+pastdue@klontong.local",
-      passwordHash: demoPasswordHash,
+      passwordHash: passwordHash,
       role: "owner",
       isActive: false,
       jobResponsibility: "Store Owner"
@@ -362,13 +361,13 @@ async function main() {
 
   await prisma.user.upsert({
     where: { email: "owner+inactive@klontong.local" },
-    update: { tenantId: tenantInactive.id, username: "owner.inactive", fullName: "Owner Inactive", passwordHash: demoPasswordHash, role: "owner", isActive: false, jobResponsibility: "Store Owner" },
+    update: { tenantId: tenantInactive.id, username: "owner.inactive", fullName: "Owner Inactive", passwordHash: passwordHash, role: "owner", isActive: false, jobResponsibility: "Store Owner" },
     create: {
       tenantId: tenantInactive.id,
       username: "owner.inactive",
       fullName: "Owner Inactive",
       email: "owner+inactive@klontong.local",
-      passwordHash: demoPasswordHash,
+      passwordHash: passwordHash,
       role: "owner",
       isActive: false,
       jobResponsibility: "Store Owner"
@@ -381,7 +380,7 @@ async function main() {
       tenantId: tenantUnpaidPending.id,
       username: "owner.pending",
       fullName: "Owner Pending Unpaid",
-      passwordHash: demoPasswordHash,
+      passwordHash: passwordHash,
       role: "owner",
       isActive: false,
       address: "Kampung Pending",
@@ -393,7 +392,7 @@ async function main() {
       username: "owner.pending",
       fullName: "Owner Pending Unpaid",
       email: "owner+pendingunpaid@klontong.local",
-      passwordHash: demoPasswordHash,
+      passwordHash: passwordHash,
       role: "owner",
       isActive: false,
       address: "Kampung Pending",
