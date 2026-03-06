@@ -16,19 +16,6 @@ Sistem informasi kelontong kampung berbasis multi-store dengan strategi offline-
 - Node.js 20+
 - MySQL 8+
 
-## Setup Cepat (CMD)
-
-1. Buka Command Prompt di root project (`gorgana_kelontong`).
-2. Jalankan:
-   - `setup.cmd`
-3. Script akan:
-   - minta kredensial MySQL,
-   - create database jika belum ada,
-   - generate `.env` backend/frontend,
-   - install dependency,
-   - migrate + seed Prisma,
-   - start server backend dan frontend otomatis.
-
 ## Setup Backend
 
 1. Masuk folder backend:
