@@ -1,5 +1,5 @@
 -- AlterTable
-ALTER TABLE `sale` ADD COLUMN `changeAmount` DECIMAL(65, 30) NULL,
+ALTER TABLE `Sale` ADD COLUMN `changeAmount` DECIMAL(65, 30) NULL,
     ADD COLUMN `paidAmount` DECIMAL(65, 30) NULL,
     ADD COLUMN `paymentDetails` JSON NULL,
     ADD COLUMN `promoCode` VARCHAR(191) NULL,
@@ -7,4 +7,4 @@ ALTER TABLE `sale` ADD COLUMN `changeAmount` DECIMAL(65, 30) NULL,
     ADD COLUMN `referenceNumber` VARCHAR(191) NULL;
 
 -- AlterTable
-ALTER TABLE `saleitem` ADD COLUMN `discount` DECIMAL(65, 30) NOT NULL DEFAULT 0;
+ALTER TABLE `SaleItem` ADD COLUMN `discount` DECIMAL(65, 30) NOT NULL DEFAULT 0;
