@@ -4,7 +4,9 @@ import crypto from "crypto";
 import { prisma } from "../src/lib/prisma";
 
 const MAIN_TENANT_ID = "00000000-0000-0000-0000-000000000001";
-const DEFAULT_PASSWORD = "password123";
+
+const superadminPassword = process.env.SUPERADMIN_PASSWORD;
+const DEFAULT_PASSWORD = superadminPassword;
 
 type PromoRecord = {
   id: string;
