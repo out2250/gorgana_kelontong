@@ -32,6 +32,8 @@ jobs:
       SLA_HEALTH_MAX_MS: 700
       SLA_AUTH_MAX_MS: 1800
       SLA_DASHBOARD_MAX_MS: 2200
+      SUPERADMIN_EMAIL: ${{ secrets.SUPERADMIN_EMAIL }}
+      SUPERADMIN_PASSWORD: ${{ secrets.SUPERADMIN_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
