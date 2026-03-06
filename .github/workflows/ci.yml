@@ -25,9 +25,9 @@ jobs:
       run:
         working-directory: gorga-kasir-be
     env:
-      DATABASE_URL: mysql://root:root@127.0.0.1:3306/kelonton_digital
-      JWT_SECRET: test_secret_12345678
-      FRONTEND_ORIGIN: http://localhost:5173
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      FRONTEND_ORIGIN: ${{ secrets.FRONTEND_ORIGIN }}
       PORT: 4000
       SLA_HEALTH_MAX_MS: 700
       SLA_AUTH_MAX_MS: 1800
