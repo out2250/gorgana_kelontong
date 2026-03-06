@@ -5,17 +5,17 @@
 
 */
 -- DropForeignKey
-ALTER TABLE `subscription` DROP FOREIGN KEY `Subscription_tenantId_fkey`;
+ALTER TABLE `Subscription` DROP FOREIGN KEY `Subscription_tenantId_fkey`;
 
 -- DropIndex
-DROP INDEX `Subscription_tenantId_status_idx` ON `subscription`;
+DROP INDEX `Subscription_tenantId_status_idx` ON `Subscription`;
 
 -- AlterTable
-ALTER TABLE `subscription` ADD COLUMN `paymentStatus` ENUM('unpaid', 'paid') NOT NULL DEFAULT 'unpaid',
+ALTER TABLE `Subscription` ADD COLUMN `paymentStatus` ENUM('unpaid', 'paid') NOT NULL DEFAULT 'unpaid',
     ADD COLUMN `trialEnabled` BOOLEAN NOT NULL DEFAULT true;
 
 -- AlterTable
-ALTER TABLE `tenant` ADD COLUMN `additionalData` JSON NULL,
+ALTER TABLE `Tenant` ADD COLUMN `additionalData` JSON NULL,
     ADD COLUMN `address` VARCHAR(191) NULL,
     ADD COLUMN `approvedAt` DATETIME(3) NULL,
     ADD COLUMN `approvedBy` VARCHAR(191) NULL,
@@ -26,7 +26,7 @@ ALTER TABLE `tenant` ADD COLUMN `additionalData` JSON NULL,
     ADD COLUMN `status` ENUM('pending_approval', 'active', 'rejected', 'inactive') NOT NULL DEFAULT 'pending_approval';
 
 -- AlterTable
-ALTER TABLE `user` ADD COLUMN `address` VARCHAR(191) NULL,
+ALTER TABLE `User` ADD COLUMN `address` VARCHAR(191) NULL,
     ADD COLUMN `jobResponsibility` VARCHAR(191) NULL,
     ADD COLUMN `phoneNumber` VARCHAR(191) NULL,
     ADD COLUMN `username` VARCHAR(191) NULL;
