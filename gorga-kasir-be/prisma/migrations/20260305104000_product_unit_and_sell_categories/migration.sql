@@ -1,4 +1,4 @@
-ALTER TABLE `product`
+ALTER TABLE `Product`
   ADD COLUMN `unitMeasure` VARCHAR(191) NULL DEFAULT 'mL',
   ADD COLUMN `unitValue` DECIMAL(65,30) NOT NULL DEFAULT 1,
   ADD COLUMN `sellCategories` JSON NULL;
