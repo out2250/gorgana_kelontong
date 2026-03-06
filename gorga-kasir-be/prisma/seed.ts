@@ -6,7 +6,10 @@ import { prisma } from "../src/lib/prisma";
 async function main() {
   const demoPasswordHash = await bcrypt.hash("password123", 10);
   const superAdminEmail = process.env.SUPERADMIN_EMAIL;
-  const superAdminPassword = await bcrypt.hash(process.env.SUPERADMIN_PASSWORD, 10);
+  const superadminPassword = process.env.SUPERADMIN_PASSWORD;
+
+  if (!superadminPassword) throw new Error("SUPERADMIN_PASSWORD not set");
+  const passwordHash = await bcrypt.hash(superadminPassword, 10);
 
   const tenantMain = await prisma.tenant.upsert({
     where: { id: "00000000-0000-0000-0000-000000000001" },
