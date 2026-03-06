@@ -5,6 +5,8 @@ import { prisma } from "../src/lib/prisma";
 
 async function main() {
   const demoPasswordHash = await bcrypt.hash("password123", 10);
+  const superAdminEmail = process.env.SUPERADMIN_EMAIL;
+  const superAdminPassword = await bcrypt.hash(process.env.SUPERADMIN_PASSWORD, 10);
 
   const tenantMain = await prisma.tenant.upsert({
     where: { id: "00000000-0000-0000-0000-000000000001" },
@@ -264,14 +266,14 @@ async function main() {
   });
 
   const superAdmin = await prisma.user.upsert({
-    where: { email: "superadmin@klontong.local" },
-    update: { tenantId: tenantMain.id, username: "superadmin.demo", fullName: "Super Admin Demo", passwordHash: demoPasswordHash, role: "owner", isActive: true, jobResponsibility: "Super Admin" },
+    where: { email: superAdminEmail },
+    update: { tenantId: tenantMain.id, username: "superadmin.demo", fullName: "Super Admin Demo", passwordHash: superAdminPassword, role: "owner", isActive: true, jobResponsibility: "Super Admin" },
     create: {
       tenantId: tenantMain.id,
       username: "superadmin.demo",
       fullName: "Super Admin Demo",
-      email: "superadmin@klontong.local",
-      passwordHash: demoPasswordHash,
+      email: superAdminEmail,
+      passwordHash: superAdminPassword,
       role: "owner",
       isActive: true,
       jobResponsibility: "Super Admin"
