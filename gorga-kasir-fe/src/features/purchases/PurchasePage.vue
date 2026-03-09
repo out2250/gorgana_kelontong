@@ -496,7 +496,12 @@ onMounted(async () => {
               <td class="px-3 py-2">{{ toRupiah(purchase.items.reduce((acc, item) => acc + Number(item.lineTotal), 0)) }}</td>
               <td class="px-3 py-2">
                 <button
-                  class="rounded border border-slate-300 px-2 py-1 text-xs"
+                  class="rounded border px-2 py-1 text-xs"
+                  :class="[
+                    receivingPurchaseId === purchase.id || getPurchaseRemainingQty(purchase) <= 0
+                      ? 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed'
+                      : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                  ]"
                   :disabled="receivingPurchaseId === purchase.id || getPurchaseRemainingQty(purchase) <= 0"
                   @click="receiveRemaining(purchase)"
                 >

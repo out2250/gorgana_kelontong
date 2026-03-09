@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from "vue";
+import { onMounted, reactive, ref, computed } from "vue";
 
+import { createLeaveRequest, getMyLeaveRequests, getUsers, type LeaveRequestDto, api } from "@/services/api";
+
+
+import { getErrorMessage } from "@/services/error";
+import { useToast } from "@/services/toast";
+import { useAuthStore } from "@/store/auth";
 import LoadingButton from "@/components/LoadingButton.vue";
 import PageErrorAlert from "@/components/PageErrorAlert.vue";
 import PageHeader from "@/components/PageHeader.vue";
-import { createLeaveRequest, getMyLeaveRequests, type LeaveRequestDto } from "@/services/api";
-import { getErrorMessage } from "@/services/error";
-import { useToast } from "@/services/toast";
-
 import UserManagementSubmenu from "./UserManagementSubmenu.vue";
 
 const toast = useToast();
@@ -16,7 +18,12 @@ const submitting = ref(false);
 const error = ref("");
 const items = ref<LeaveRequestDto[]>([]);
 
+const users = ref<{ id: string; fullName: string; role: string }[]>([]);
+const auth = useAuthStore();
+const canAssign = computed(() => Boolean(auth.user?.isSuperAdmin || auth.user?.role === "owner"));
+
 const form = reactive({
+  userId: "",
   type: "leave" as "leave" | "sick",
   startDate: "",
   endDate: "",
@@ -29,6 +36,13 @@ async function loadData() {
   try {
     const result = await getMyLeaveRequests();
     items.value = result.items;
+    if (canAssign.value) {
+      const userResult = await getUsers({ page: 1, pageSize: 100, isActive: true });
+      users.value = userResult.items.map(u => ({ id: u.id, fullName: u.fullName, role: u.role }));
+      if (!form.userId && users.value.length > 0) {
+        form.userId = users.value[0].id;
+      }
+    }
   } catch (err) {
     error.value = getErrorMessage(err, "Gagal memuat leave requests");
     toast.error(error.value);
@@ -42,16 +56,32 @@ async function submitRequest() {
     toast.warning("Tanggal dan alasan wajib diisi");
     return;
   }
-
+  if (canAssign.value && !form.userId) {
+    toast.warning("Pilih user yang akan diajukan leave");
+    return;
+  }
   submitting.value = true;
   try {
-    await createLeaveRequest({
-      type: form.type,
-      startDate: form.startDate,
-      endDate: form.endDate,
-      reason: form.reason.trim()
-    });
-    toast.success("Request berhasil diajukan");
+    if (canAssign.value && form.userId && form.userId !== auth.user?.id) {
+      // Assign leave for other user
+      await api.post("/hr/leave-requests/assign", {
+        userId: form.userId,
+        type: form.type,
+        startDate: form.startDate,
+        endDate: form.endDate,
+        reason: form.reason.trim()
+      });
+      toast.success("Leave berhasil diajukan untuk user lain");
+    } else {
+      // Normal self leave request
+      await createLeaveRequest({
+        type: form.type,
+        startDate: form.startDate,
+        endDate: form.endDate,
+        reason: form.reason.trim()
+      });
+      toast.success("Request berhasil diajukan");
+    }
     form.reason = "";
     await loadData();
   } catch (err) {
@@ -72,7 +102,12 @@ onMounted(() => {
     <PageHeader title="Leave Requests" subtitle="Pengajuan cuti/sakit oleh bawahan beserta history." />
     <UserManagementSubmenu />
 
-    <form class="mt-4 grid gap-2 rounded-xl border border-slate-200 p-3 md:grid-cols-4" @submit.prevent="submitRequest">
+    <form class="mt-4 grid gap-2 rounded-xl border border-slate-200 p-3 md:grid-cols-5" @submit.prevent="submitRequest">
+      <template v-if="canAssign">
+        <select v-model="form.userId" class="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+          <option v-for="user in users" :key="user.id" :value="user.id">{{ user.fullName }} ({{ user.role }})</option>
+        </select>
+      </template>
       <select v-model="form.type" class="rounded-lg border border-slate-300 px-3 py-2 text-sm">
         <option value="leave">Leave</option>
         <option value="sick">Sick</option>
@@ -84,13 +119,14 @@ onMounted(() => {
         loading-text="Mengajukan..."
         class="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white"
         type="submit"
+        :disabled="submitting"
       >
         Ajukan
       </LoadingButton>
       <textarea
         v-model="form.reason"
         rows="2"
-        class="md:col-span-4 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+        class="md:col-span-5 rounded-lg border border-slate-300 px-3 py-2 text-sm"
         placeholder="Alasan leave/sick"
       />
     </form>

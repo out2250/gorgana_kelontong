@@ -223,7 +223,65 @@ export async function hrRoutes(app: FastifyInstance) {
       return { items };
     }
   );
-
+app.post(
+    "/hr/leave-requests/:id/decision",
+    { preHandler: [requireAuth, requireActiveSubscription] },
+    async (request, reply) => {
+      const auth = request.auth;
+      if (!auth?.tenantId) {
+        return reply.status(401).send({ message: "Unauthorized" });
+      }
+      if (!isApprover(auth.role, auth.isSuperAdmin)) {
+        return reply.status(403).send({ message: "Forbidden" });
+      }
+      const params = IdParamSchema.safeParse(request.params);
+      const body = LeaveDecisionSchema.safeParse(request.body);
+      if (!params.success || !body.success) {
+        return reply.status(400).send({ message: "Invalid payload" });
+      }
+      const tenant = await prisma.tenant.findUnique({ where: { id: auth.tenantId }, select: { additionalData: true } });
+      if (!tenant) {
+        return reply.status(404).send({ message: "Tenant not found" });
+      }
+      const hrData = readHrData(tenant.additionalData);
+      const targetIndex = hrData.leaveRequests.findIndex((item) => item.id === params.data.id);
+      if (targetIndex < 0) {
+        return reply.status(404).send({ message: "Leave request not found" });
+      }
+      const target = hrData.leaveRequests[targetIndex];
+      if (target.status !== "pending") {
+        return reply.status(409).send({ message: "Leave request already processed" });
+      }
+      const updated: LeaveRequestItem = {
+        ...target,
+        status: body.data.decision,
+        note: body.data.note,
+        reviewedByUserId: auth.userId,
+        reviewedAt: new Date().toISOString()
+      };
+      hrData.leaveRequests[targetIndex] = updated;
+      // If approved, update user status if leave is active
+      if (body.data.decision === "approved") {
+        const currentDate = todayDate();
+        if (isDateBetween(currentDate, updated.startDate, updated.endDate)) {
+          await prisma.user.update({
+            where: { id: updated.userId },
+            data: {
+              conditionStatus: updated.type === "leave" ? "on_leave" : "sick",
+              attendanceStatus: "off"
+            }
+          });
+        }
+      }
+      await prisma.tenant.update({
+        where: { id: auth.tenantId },
+        data: {
+          additionalData: writeHrData(tenant.additionalData, hrData) as unknown as object
+        }
+      });
+      return updated;
+    }
+  );
   app.post(
     "/hr/leave-requests",
     { preHandler: [requireAuth, requireActiveSubscription] },
@@ -277,6 +335,84 @@ export async function hrRoutes(app: FastifyInstance) {
     }
   );
 
+  // Endpoint: Owner/Superadmin submit leave for other users
+  app.post(
+    "/hr/leave-requests/assign",
+    { preHandler: [requireAuth, requireActiveSubscription] },
+    async (request, reply) => {
+      const auth = request.auth;
+      if (!auth?.tenantId) {
+        return reply.status(401).send({ message: "Unauthorized" });
+      }
+      // Only owner/superadmin can assign leave for others
+      if (!isApprover(auth.role, auth.isSuperAdmin)) {
+        return reply.status(403).send({ message: "Forbidden" });
+      }
+      const AssignLeaveSchema = z.object({
+        userId: z.string().uuid(),
+        type: z.enum(["leave", "sick"]),
+        startDate: z.string().min(10),
+        endDate: z.string().min(10),
+        reason: z.string().min(3).max(500)
+      });
+      const parsed = AssignLeaveSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.status(400).send({ message: "Invalid payload" });
+      }
+      if (parsed.data.endDate < parsed.data.startDate) {
+        return reply.status(422).send({ message: "Tanggal selesai tidak boleh sebelum tanggal mulai" });
+      }
+      const [tenant, user] = await Promise.all([
+        prisma.tenant.findUnique({ where: { id: auth.tenantId }, select: { additionalData: true } }),
+        prisma.user.findUnique({ where: { id: parsed.data.userId }, select: { fullName: true } })
+      ]);
+      if (!tenant || !user) {
+        return reply.status(404).send({ message: "Data tidak ditemukan" });
+      }
+      const hrData = readHrData(tenant.additionalData);
+      // Auto-approve if assigned user is owner
+      let status: "pending" | "approved" = "pending";
+      const assignedUser = await prisma.user.findUnique({ where: { id: parsed.data.userId }, select: { role: true } });
+      if (assignedUser?.role === "owner") {
+        status = "approved";
+      }
+      const next: LeaveRequestItem = {
+        id: randomUUID(),
+        userId: parsed.data.userId,
+        userName: user.fullName,
+        type: parsed.data.type,
+        startDate: parsed.data.startDate,
+        endDate: parsed.data.endDate,
+        reason: parsed.data.reason,
+        status,
+        note: status === "approved" ? "Auto-approved for owner" : undefined,
+        reviewedByUserId: status === "approved" ? auth.userId : undefined,
+        reviewedAt: status === "approved" ? new Date().toISOString() : undefined,
+        createdAt: new Date().toISOString()
+      };
+      hrData.leaveRequests.unshift(next);
+      if (status === "approved") {
+        // Update user status if leave is active
+        const currentDate = todayDate();
+        if (isDateBetween(currentDate, next.startDate, next.endDate)) {
+          await prisma.user.update({
+            where: { id: next.userId },
+            data: {
+              conditionStatus: next.type === "leave" ? "on_leave" : "sick",
+              attendanceStatus: "off"
+            }
+          });
+        }
+      }
+      await prisma.tenant.update({
+        where: { id: auth.tenantId },
+        data: {
+          additionalData: writeHrData(tenant.additionalData, hrData) as unknown as object
+        }
+      });
+      return reply.status(201).send(next);
+    }
+  );
   app.get(
     "/hr/leave-requests/approvals",
     { preHandler: [requireAuth, requireActiveSubscription] },
@@ -286,93 +422,22 @@ export async function hrRoutes(app: FastifyInstance) {
         return reply.status(401).send({ message: "Unauthorized" });
       }
 
-      if (!isApprover(auth.role, auth.isSuperAdmin)) {
-        return reply.status(403).send({ message: "Forbidden" });
-      }
 
-      const query = LeaveListQuerySchema.safeParse(request.query);
-      if (!query.success) {
-        return reply.status(400).send({ message: "Invalid query" });
-      }
-
+      // Only fetch and return leave requests for approval
       const tenant = await prisma.tenant.findUnique({ where: { id: auth.tenantId }, select: { additionalData: true } });
       if (!tenant) {
         return reply.status(404).send({ message: "Tenant not found" });
       }
-
+      const query = LeaveListQuerySchema.safeParse(request.query);
+      if (!query.success) {
+        return reply.status(400).send({ message: "Invalid query" });
+      }
       const hrData = readHrData(tenant.additionalData);
       const items = hrData.leaveRequests
         .filter((item) => query.data.status ? item.status === query.data.status : true)
         .filter((item) => query.data.type ? item.type === query.data.type : true)
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-
       return { items };
-    }
-  );
-
-  app.post(
-    "/hr/leave-requests/:id/decision",
-    { preHandler: [requireAuth, requireActiveSubscription] },
-    async (request, reply) => {
-      const auth = request.auth;
-      if (!auth?.tenantId) {
-        return reply.status(401).send({ message: "Unauthorized" });
-      }
-
-      if (!isApprover(auth.role, auth.isSuperAdmin)) {
-        return reply.status(403).send({ message: "Forbidden" });
-      }
-
-      const params = IdParamSchema.safeParse(request.params);
-      const body = LeaveDecisionSchema.safeParse(request.body);
-      if (!params.success || !body.success) {
-        return reply.status(400).send({ message: "Invalid payload" });
-      }
-
-      const tenant = await prisma.tenant.findUnique({ where: { id: auth.tenantId }, select: { additionalData: true } });
-      if (!tenant) {
-        return reply.status(404).send({ message: "Tenant not found" });
-      }
-
-      const hrData = readHrData(tenant.additionalData);
-      const targetIndex = hrData.leaveRequests.findIndex((item) => item.id === params.data.id);
-      if (targetIndex < 0) {
-        return reply.status(404).send({ message: "Leave request not found" });
-      }
-
-      const now = new Date().toISOString();
-      const target = hrData.leaveRequests[targetIndex];
-      const updated: LeaveRequestItem = {
-        ...target,
-        status: body.data.decision,
-        note: body.data.note,
-        reviewedByUserId: auth.userId,
-        reviewedAt: now
-      };
-
-      hrData.leaveRequests[targetIndex] = updated;
-
-      if (body.data.decision === "approved") {
-        const currentDate = todayDate();
-        if (isDateBetween(currentDate, updated.startDate, updated.endDate)) {
-          await prisma.user.update({
-            where: { id: updated.userId },
-            data: {
-              conditionStatus: updated.type === "leave" ? "on_leave" : "sick",
-              attendanceStatus: "off"
-            }
-          });
-        }
-      }
-
-      await prisma.tenant.update({
-        where: { id: auth.tenantId },
-        data: {
-          additionalData: writeHrData(tenant.additionalData, hrData) as unknown as object
-        }
-      });
-
-      return updated;
     }
   );
 
@@ -881,6 +946,84 @@ export async function hrRoutes(app: FastifyInstance) {
 
       if (!isApprover(auth.role, auth.isSuperAdmin)) {
         return reply.status(403).send({ message: "Forbidden" });
+    // Endpoint: Owner/Superadmin submit leave for other users
+    app.post(
+      "/hr/leave-requests/assign",
+      { preHandler: [requireAuth, requireActiveSubscription] },
+      async (request, reply) => {
+        const auth = request.auth;
+        if (!auth?.tenantId) {
+          return reply.status(401).send({ message: "Unauthorized" });
+        }
+        // Only owner/superadmin can assign leave for others
+        if (!isApprover(auth.role, auth.isSuperAdmin)) {
+          return reply.status(403).send({ message: "Forbidden" });
+        }
+        const AssignLeaveSchema = z.object({
+          userId: z.string().uuid(),
+          type: z.enum(["leave", "sick"]),
+          startDate: z.string().min(10),
+          endDate: z.string().min(10),
+          reason: z.string().min(3).max(500)
+        });
+        const parsed = AssignLeaveSchema.safeParse(request.body);
+        if (!parsed.success) {
+          return reply.status(400).send({ message: "Invalid payload" });
+        }
+        if (parsed.data.endDate < parsed.data.startDate) {
+          return reply.status(422).send({ message: "Tanggal selesai tidak boleh sebelum tanggal mulai" });
+        }
+        const [tenant, user] = await Promise.all([
+          prisma.tenant.findUnique({ where: { id: auth.tenantId }, select: { additionalData: true } }),
+          prisma.user.findUnique({ where: { id: parsed.data.userId }, select: { fullName: true } })
+        ]);
+        if (!tenant || !user) {
+          return reply.status(404).send({ message: "Data tidak ditemukan" });
+        }
+        const hrData = readHrData(tenant.additionalData);
+        // Auto-approve if assigned user is owner
+        let status: "pending" | "approved" = "pending";
+        const assignedUser = await prisma.user.findUnique({ where: { id: parsed.data.userId }, select: { role: true } });
+        if (assignedUser?.role === "owner") {
+          status = "approved";
+        }
+        const next: LeaveRequestItem = {
+          id: randomUUID(),
+          userId: parsed.data.userId,
+          userName: user.fullName,
+          type: parsed.data.type,
+          startDate: parsed.data.startDate,
+          endDate: parsed.data.endDate,
+          reason: parsed.data.reason,
+          status,
+          note: status === "approved" ? "Auto-approved for owner" : undefined,
+          reviewedByUserId: status === "approved" ? auth.userId : undefined,
+          reviewedAt: status === "approved" ? new Date().toISOString() : undefined,
+          createdAt: new Date().toISOString()
+        };
+        hrData.leaveRequests.unshift(next);
+        if (status === "approved") {
+          // Update user status if leave is active
+          const currentDate = todayDate();
+          if (isDateBetween(currentDate, next.startDate, next.endDate)) {
+            await prisma.user.update({
+              where: { id: next.userId },
+              data: {
+                conditionStatus: next.type === "leave" ? "on_leave" : "sick",
+                attendanceStatus: "off"
+              }
+            });
+          }
+        }
+        await prisma.tenant.update({
+          where: { id: auth.tenantId },
+          data: {
+            additionalData: writeHrData(tenant.additionalData, hrData) as unknown as object
+          }
+        });
+        return reply.status(201).send(next);
+      }
+    );
       }
 
       const params = IdParamSchema.safeParse(request.params);
