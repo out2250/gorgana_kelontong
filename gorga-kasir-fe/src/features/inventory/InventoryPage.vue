@@ -300,6 +300,14 @@ async function loadCatalogMasters() {
   suppliers.value = supplierResult.items;
 }
 
+watch(page, (newPage) => {
+  if (newPage < 1) {
+    page.value = 1;
+  } else if (newPage > pagination.value.totalPages) {
+    page.value = pagination.value.totalPages;
+  }
+});
+
 async function loadProducts() {
   if (!selectedStoreId.value) return;
   const result = await getProducts({
@@ -498,6 +506,7 @@ watch(selectedStoreId, () => {
   adjustmentForm.productId = "";
   void loadProducts();
 });
+
 
 onMounted(async () => {
   try {
