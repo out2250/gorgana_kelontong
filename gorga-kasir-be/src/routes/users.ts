@@ -157,6 +157,7 @@ export async function userRoutes(app: FastifyInstance) {
     },
     async (request, reply) => {
       const tenantId = request.auth?.tenantId;
+      const isSuperAdmin = request.auth?.isSuperAdmin;
       if (!tenantId) {
         return reply.status(401).send({ message: "Unauthorized" });
       }
@@ -169,6 +170,25 @@ export async function userRoutes(app: FastifyInstance) {
             ? `Invalid payload: ${firstIssue.path.join(".") || "field"} ${firstIssue.message}`
             : "Invalid payload"
         });
+      }
+
+
+      // Owner cannot create user with role owner
+      if (!isSuperAdmin && parsed.data.role === "owner") {
+        return reply.status(403).send({ message: "Owner cannot create user with role owner" });
+      }
+
+      // Only one owner per tenant (except superadmin)
+      if (parsed.data.role === "owner" && !isSuperAdmin) {
+        const ownerCount = await prisma.user.count({
+          where: {
+            tenantId,
+            role: "owner"
+          }
+        });
+        if (ownerCount > 0) {
+          return reply.status(422).send({ message: "Tenant already has an owner" });
+        }
       }
 
       const existing = await prisma.user.findUnique({ where: { email: parsed.data.email } });
