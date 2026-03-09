@@ -32,3 +32,7 @@ Thumbs.db
 **/*progress*
 **/*checkpoint*
 **/ini_output_progress-ai/
+
+# Seed
+prisma/seed.ts
+prisma/seed.bulk.ts
